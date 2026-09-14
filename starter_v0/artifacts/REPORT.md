@@ -333,6 +333,39 @@ còn lại chỉ tích hợp nội dung sau khi nhận được, không viết t
 - **Điều tôi học được từ phần việc này:** UI cho agent cần cho phép audit tool name, arguments, result/error và artifact hash, không chỉ hiển thị final answer.
 - **Nếu làm lại, tôi sẽ cải thiện điều gì:** Thêm test tự động cho session state, duplicate tool calls, confirmation state và việc tuân thủ JSON output contract.
 
+### Trịnh Đức Huy - 2A202602865
+
+- **Vai trò/phần việc được nhận:** Tool interface & môi trường: kiểm tra setup, tính nhất quán giữa tool declarations và registry, làm rõ cách sử dụng từng tool.
+- **Những gì tôi đã thay đổi trong repo chung:** Rà soát và đồng bộ tool declarations với registry; làm rõ mô tả, arguments/schema và điều kiện sử dụng từng tool; bổ sung evidence kiểm tra môi trường, local smoke và provider preflight; hoàn thiện bảng tool trong report. Chỉ sửa implementation khi phát hiện lỗi thực tế.
+- **File hoặc artifact liên quan:** artifacts/tools.yaml, registry và các implementation tool liên quan, evidence kiểm tra setup/tool, bảng tool trong REPORT.md.
+- **Commit hash hoặc pull request:** - **Commit hash hoặc pull request:** `b1e8d2f` — Lam tool.
+- **Một quyết định kỹ thuật tôi đã đưa ra và lý do:** Ưu tiên làm rõ interface và schema trước khi thay đổi implementation, đặc biệt ở các nhóm dễ nhầm như service với device, KB với policy, format với tra cứu, để agent chọn đúng tool và truyền đúng arguments.
+- **Khó khăn tôi gặp và cách tôi xử lý:** Ranh giới sử dụng giữa một số tool chưa rõ; tôi đối chiếu declaration, registry và implementation, kết hợp local smoke và provider preflight để phân biệt vấn đề interface với lỗi môi trường hoặc provider.
+- **Điều tôi học được từ phần việc này:** Tool chạy đúng chưa đủ; mô tả, schema và tên đăng ký phải nhất quán để agent sử dụng đúng. Evidence kiểm tra cũng cần giúp xác định lỗi nằm ở setup, provider hay implementation.
+- **Nếu làm lại, tôi sẽ cải thiện điều gì:** Bổ sung kiểm tra tự động giữa declarations và registry, đồng thời kiểm chứng hypothesis rằng mô tả có điều kiện sử dụng và ví dụ arguments rõ ràng sẽ giảm việc chọn nhầm tool hoặc truyền sai tham số.
+
+### Trịnh Hoàng Tùng - 2A202602937
+
+- **Vai trò/phần việc được nhận:** Evaluation & Safety — xây dựng eval cases, chạy các version, adversarial testing và review safety.
+- **Những gì tôi đã thay đổi trong repo chung:** Viết 10 evaluation cases (5 single-turn, 5 multi-turn); chạy baseline/các version cải tiến; thực hiện adversarial testing và review các vấn đề về confirmation, prompt injection và dữ liệu gửi ra ngoài.
+- **File hoặc artifact liên quan:** data/eval_group.json, artifacts/version_log.csv, các file run trong runs/.
+- **Commit hash hoặc pull request:** - **Commit hash hoặc pull request:** `1be1b75` — Update sau test tool va prompt.
+- **Một quyết định kỹ thuật tôi đã đưa ra và lý do:** Không chỉ đánh giá accuracy mà kết hợp single-turn, multi-turn và adversarial cases để kiểm tra cả khả năng xử lý context và safety boundary.
+- **Khó khăn tôi gặp và cách tôi xử lý:** Một số failure khó phân biệt do prompt, tool interface hay runtime. Tôi đối chiếu tool trace, run evidence và review thủ công các security cases.
+- **Điều tôi học được từ phần việc này:** Đánh giá AI Agent cần kiểm tra cả tool call, state, confirmation và security boundary, không chỉ kết quả cuối cùng.
+- **Nếu làm lại, tôi sẽ cải thiện điều gì:** Tự động hóa việc chạy và so sánh các version, đồng thời mở rộng adversarial test và regression test.
+
+###  Nguyễn Hoàng Sơn - 2A202602457
+
+- **Vai trò/phần việc được nhận:** Prompt & hội thoại: phân tích và cải tiến system prompt để agent xử lý đúng tình huống thiếu thông tin, correction/cancellation và hội thoại multi-turn.
+- **Những gì tôi đã thay đổi trong repo chung:** Rà soát trace để xác định lỗi; bổ sung hướng dẫn hỏi lại khi thiếu thông tin, không tự đoán ID, cập nhật yêu cầu khi người dùng đính chính và dừng thao tác khi người dùng hủy. Phối hợp với Trịnh Hoàng Tùng làm rõ confirmation và cách xử lý injection; viết failure analysis và technical reflection trong report.
+- **File hoặc artifact liên quan:** artifacts/system_prompt.md, các trace/transcript dùng để phân tích trước/sau và phần liên quan trong
+- **Commit hash hoặc pull request:** - **Commit hash hoặc pull request:** `f610194` — prompt ,`4e2a9fe` — sửa prompt.
+- **Một quyết định kỹ thuật tôi đã đưa ra và lý do:** Quy định agent chỉ sử dụng ID có nguồn từ người dùng hoặc kết quả tool, đồng thời hỏi lại khi chưa đủ thông tin để xác định đối tượng, nhằm tránh thao tác sai do tự suy đoán.
+- **Khó khăn tôi gặp và cách tôi xử lý:** Trong hội thoại nhiều lượt, agent có thể tiếp tục dùng thông tin cũ sau khi người dùng sửa hoặc hủy yêu cầu. Tôi dựa trên trace để làm rõ quy tắc cập nhật ngữ cảnh và phối hợp Trịnh Hoàng Tùng xử lý việc xác nhận lại khi nội dung thao tác thay đổi.
+- **Điều tôi học được từ phần việc này:** Prompt cần quy định rõ hành vi tại từng điểm ra quyết định. Phân tích trace trước/sau giúp đánh giá thay đổi có xử lý đúng nguyên nhân lỗi hay chỉ phù hợp với một tình huống cụ thể..
+- **Nếu làm lại, tôi sẽ cải thiện điều gì:** Xây dựng bộ tình huống hồi quy cho thiếu thông tin, ID mơ hồ, correction/cancellation và multi-turn; với mỗi thay đổi prompt, ghi rõ hypothesis, hành vi kỳ vọng và kết quả trước/sau để kiểm chứng hiệu quả.
+
 Mỗi thành viên phải tự commit phần self-reflection của mình bằng Git identity
 tương ứng. Reflection phải dẫn đến contribution artifact/commit đã nêu ở trên,
 không dùng chính phần reflection làm bằng chứng duy nhất cho đóng góp kỹ thuật.
