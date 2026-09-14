@@ -327,7 +327,7 @@ còn lại chỉ tích hợp nội dung sau khi nhận được, không viết t
 - **Vai trò/phần việc được nhận:** NUI & tích hợp bài nộp.
 - **Những gì tôi đã thay đổi trong repo chung:** Xây Streamlit chat UI dùng chung runtime, hiển thị auditable tool trace và artifact version; chạy bốn scenario; thu transcript; tạo thông tin nhóm và tích hợp report.
 - **File hoặc artifact liên quan:** `starter_v0/app.py`, `starter_v0/requirements.txt`, `starter_v0/transcripts/v4_openrouter_20260914T223419122641.transcript.json`, `TEAMMATES.md`, `starter_v0/artifacts/REPORT.md`.
-- **Commit hash hoặc pull request:** Branch `contrib/an1-tech-ui`; bổ sung commit hash/PR URL sau khi commit và push.
+- **Commit hash hoặc pull request:** - **Commit hash hoặc pull request:** `3b56027` — UI, transcript và integration evidence.
 - **Một quyết định kỹ thuật tôi đã đưa ra và lý do:** Tái sử dụng `run_model_tool_loop` từ `chat.py` để UI, CLI và transcript không có các đường thực thi tool khác nhau.
 - **Khó khăn tôi gặp và cách tôi xử lý:** API key đầu tiên bị 401, sau khi thay key tài khoản không có credit cho model mặc định; tôi dùng `openrouter/free` để hoàn thành UI demo và lưu chính xác model trong transcript.
 - **Điều tôi học được từ phần việc này:** UI cho agent cần cho phép audit tool name, arguments, result/error và artifact hash, không chỉ hiển thị final answer.
