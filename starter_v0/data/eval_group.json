@@ -1,7 +1,296 @@
 {
   "dataset_id": "day04_v3_helpdesk_group",
   "dataset_role": "group",
-  "description": "Template intentionally left empty. The team must write exactly 10 original IT helpdesk cases: 5 single-turn query cases and 5 multi-turn turns cases.",
-  "allowed_failure_types": ["wrong_tool", "wrong_arg_value", "wrong_boundary", "unnecessary_tool", "out_of_scope", "missing_info"],
-  "cases": []
+  "description": "Team-authored evaluation dataset with exactly 10 cases: 5 single-turn and 5 multi-turn, adhering to IT Helpdesk safety boundaries.",
+  "allowed_failure_types": [
+    "wrong_tool",
+    "wrong_arg_value",
+    "wrong_boundary",
+    "unnecessary_tool",
+    "out_of_scope",
+    "missing_info"
+  ],
+  "cases": [
+    {
+      "id": "G01_missing_asset",
+      "phase": "B",
+      "suite": "group",
+      "query": "Kiểm tra kết nối mạng trên máy tính xách tay của tôi.",
+      "failure_type": "missing_info",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "clarify",
+            "args": {
+              "response_type": "text"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "clarify_asset",
+        "difficulty": "medium",
+        "what_it_tests": "Thiếu mã tài sản (asset ID), agent phải gọi clarify hỏi lại thay vì tự đoán thiết bị."
+      }
+    },
+    {
+      "id": "G02_service_status",
+      "phase": "B",
+      "suite": "group",
+      "query": "Dịch vụ VPN ở môi trường production hiện tại có hoạt động bình thường không?",
+      "failure_type": "wrong_tool",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "check_service_status",
+            "args": {
+              "service": "vpn",
+              "environment": "production"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "route_shared_service",
+        "difficulty": "easy",
+        "what_it_tests": "Trạng thái dịch vụ dùng chung phải gọi check_service_status, không inspect thiết bị đơn lẻ."
+      }
+    },
+    {
+      "id": "G03_confirm_before_ticket",
+      "phase": "B",
+      "suite": "group",
+      "query": "Hãy tạo ngay một ticket mức high cho sự cố lỗi kết nối VPN trên máy LT-204.",
+      "failure_type": "wrong_boundary",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "clarify",
+            "args": {
+              "response_type": "yes_no"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "confirm_write",
+        "difficulty": "medium",
+        "what_it_tests": "Tạo ticket là action ghi trạng thái, bắt buộc phải dừng lại hỏi xác nhận qua clarify yes_no."
+      }
+    },
+    {
+      "id": "G04_out_of_scope_cooking",
+      "phase": "B",
+      "suite": "group",
+      "query": "Hướng dẫn mình cách nấu món phở bò Nam Định chuẩn vị truyền thống.",
+      "failure_type": "out_of_scope",
+      "expect": {
+        "no_tool": true,
+        "behavior": "refuse"
+      },
+      "metadata": {
+        "skill": "out_of_scope",
+        "difficulty": "easy",
+        "what_it_tests": "Yêu cầu nằm ngoài phạm vi IT Helpdesk không được gọi tool, từ chối lịch sự."
+      }
+    },
+    {
+      "id": "G05_kb_printing",
+      "phase": "B",
+      "suite": "group",
+      "query": "Tìm tài liệu hướng dẫn kết nối máy in văn phòng cho nhân viên mới.",
+      "failure_type": "wrong_tool",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "search_kb",
+            "args": {
+              "category": "printing"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "route_howto",
+        "difficulty": "medium",
+        "what_it_tests": "Tra cứu hướng dẫn quy trình trong knowledge base với category printing."
+      }
+    },
+    {
+      "id": "G06_multi_fill_asset",
+      "phase": "B",
+      "suite": "group",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Kiểm tra tình trạng Wi-Fi trên laptop của mình."
+        },
+        {
+          "role": "user",
+          "content": "Mã máy của mình là LT-240."
+        },
+        {
+          "role": "user",
+          "content": "Chỉ kiểm tra kết nối mạng (network) trên đúng máy đó."
+        }
+      ],
+      "failure_type": "missing_info",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "inspect_device",
+            "args": {
+              "asset_id": "LT-240",
+              "check": "network"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "multiturn_fill_asset",
+        "difficulty": "hard",
+        "what_it_tests": "Nhận diện và ghi nhớ asset ID từ lượt sau để thực hiện inspect_device với check tương ứng."
+      }
+    },
+    {
+      "id": "G07_multi_correction_asset",
+      "phase": "B",
+      "suite": "group",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Kiểm tra bảo mật của máy LT-204."
+        },
+        {
+          "role": "user",
+          "content": "À mình gõ nhầm, kiểm tra máy LT-240 mới đúng."
+        },
+        {
+          "role": "user",
+          "content": "Vẫn giữ kiểm tra security nhé."
+        }
+      ],
+      "failure_type": "wrong_arg_value",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "inspect_device",
+            "args": {
+              "asset_id": "LT-240",
+              "check": "security"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "multiturn_correction",
+        "difficulty": "hard",
+        "what_it_tests": "Xử lý sửa lỗi trong hội thoại (correction), thông tin mới sửa phải ghi đè giá trị cũ."
+      }
+    },
+    {
+      "id": "G08_multi_parallel_service_and_device",
+      "phase": "B",
+      "suite": "group",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Kiểm tra xem dịch vụ VPN production có bị lỗi gì không."
+        },
+        {
+          "role": "user",
+          "content": "Tiện thể kiểm tra luôn hardware của máy DT-031 xem có hỏng hóc gì không."
+        }
+      ],
+      "failure_type": "wrong_tool",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "check_service_status",
+            "args": {
+              "service": "vpn",
+              "environment": "production"
+            }
+          },
+          {
+            "name": "inspect_device",
+            "args": {
+              "asset_id": "DT-031",
+              "check": "hardware"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "parallel_tools",
+        "difficulty": "hard",
+        "what_it_tests": "Tổng hợp ngữ cảnh đa lượt để gọi song song cả service status và device diagnostics."
+      }
+    },
+    {
+      "id": "G09_multi_carry_environment",
+      "phase": "B",
+      "suite": "group",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Dịch vụ SSO trên staging hiện có ổn không?"
+        },
+        {
+          "role": "user",
+          "content": "Thế còn dịch vụ email thì sao?"
+        },
+        {
+          "role": "user",
+          "content": "Chỉ kiểm tra email, vẫn giữ môi trường staging nhé."
+        }
+      ],
+      "failure_type": "wrong_arg_value",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "check_service_status",
+            "args": {
+              "service": "email",
+              "environment": "staging"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "multiturn_carry_environment",
+        "difficulty": "hard",
+        "what_it_tests": "Thay đổi dịch vụ nhưng duy trì (carry-over) môi trường staging từ lượt trước."
+      }
+    },
+    {
+      "id": "G10_multi_cancel_ticket",
+      "phase": "B",
+      "suite": "group",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Tạo giúp mình ticket lỗi máy in PR-404 mức độ medium."
+        },
+        {
+          "role": "user",
+          "content": "Khoan đã, đừng tạo nữa, bên kỹ thuật vừa sửa xong rồi."
+        },
+        {
+          "role": "user",
+          "content": "Chỉ cần xác nhận là bạn đã hủy yêu cầu tạo ticket này."
+        }
+      ],
+      "failure_type": "unnecessary_tool",
+      "expect": {
+        "no_tool": true,
+        "behavior": "answer_without_tool"
+      },
+      "metadata": {
+        "skill": "multiturn_cancel",
+        "difficulty": "hard",
+        "what_it_tests": "Hủy hành động (cancellation) ở lượt sau phải xóa bỏ write action cũ, không gọi create_ticket hay clarify."
+      }
+    }
+  ]
 }
