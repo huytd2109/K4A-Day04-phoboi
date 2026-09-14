@@ -10,4 +10,6 @@ side_effect: false
 # clarify
 
 Returns a question to the user and pauses until the next user turn.
-`response_type` is free text, yes/no, or a choice from `options`.
+Model calls must include both `question` and `response_type`. Use `text` for a
+free-form identifier/value, `yes_no` for confirmation, and `choice` with a
+non-empty `options` list for a closed enum.
