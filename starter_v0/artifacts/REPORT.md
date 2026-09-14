@@ -1,20 +1,23 @@
-# Day 04 Lab Report — IT Helpdesk Agent (prompt v3 / tool interface v4)
+# Day 04 Lab Report — IT Helpdesk Agent (prompt candidate sau v3 / tool interface v4 / UI v4)
 
 ## Team
 
-- Team:
-- Members:
-- Provider/model:
+- Team: phoboi
+- Members: Nguyễn Hoàng Sơn; Trịnh Đức Huy; Trịnh Hoàng Tùng; Đỗ Quốc An
+- Provider/model: Eval evidence dùng OpenRouter theo từng run; UI demo dùng `openrouter/free`
 
 # PHẦN A — Giới thiệu agent
 
 ## A1. Agent này làm được gì
 
-> Viết 1–2 câu mô tả capability và giới hạn của agent.
+Northstar Labs IT Helpdesk Agent hỗ trợ kiểm tra shared-service status, diagnostic
+thiết bị, hồ sơ nhân viên, knowledge base, policy, định dạng incident report,
+tra cứu thông tin thiết bị công khai và tạo ticket giả lập. Agent không tự đoán
+identifier, không xử lý secret và yêu cầu xác nhận trước action có side effect.
 
 **Link dùng thử:**
 
-> URL:
+> Local Streamlit UI: chạy `streamlit run app.py` từ thư mục `starter_v0/`.
 
 ## A2. Tool agent có
 
@@ -32,15 +35,22 @@
 
 ## A3. Câu hỏi mẫu
 
-1.
-2.
-3.
+1. Dịch vụ VPN production hiện có gặp sự cố không?
+2. Kiểm tra Wi-Fi trên laptop của mình; sau đó cung cấp asset ID `LT-240` và chỉ kiểm tra network.
+3. Tạo ticket mức high cho lỗi VPN `AUTH_TIMEOUT` trên `LT-204` và xác nhận ở lượt tiếp theo.
 
 ## A4. Kịch bản demo đã rehearse
 
 | Scenario | Tool trace cần thấy | Cải thiện version | Fallback run/transcript |
 |---|---|---|---|
-|  |  |  |  |
+| Normal — VPN production | `check_service_status(service=vpn, environment=production)` | Routing đúng shared service thay vì device | `transcripts/v4_openrouter_20260914T223419122641.transcript.json`, turn 1 |
+| Missing info — Wi-Fi trên laptop | Yêu cầu asset ID, sau đó `inspect_device(asset_id=LT-240, check=network)` | Không tự đoán identifier; UI giữ context giữa hai lượt | Cùng transcript, turn 2–3 |
+| Multi-turn — carry environment | `check_service_status(service=email, environment=staging)` ở intent cuối | Carry field còn hiệu lực và latest intent wins | Cùng transcript, turn 4–6 |
+| Action boundary — ticket | `clarify(response_type=yes_no)` rồi mới `create_ticket(..., confirmed=true)` | Xác nhận exact payload trước side effect | Cùng transcript, turn 7–8 |
+
+Transcript trên là fallback cho demo khi provider miễn phí bị rate limit hoặc
+không ổn định. Nó ghi `provider=openrouter`, `model=openrouter/free`, không có
+provider error và chứa toàn bộ tool arguments/results cần trình bày.
 
 # PHẦN B — Chi tiết và evidence
 
@@ -144,6 +154,15 @@ Evidence file: `runs/v3_B_group_openrouter_20260914T191012383225.json` (Passed: 
 | Kiểm tra song song VPN và máy LT-204 | v3 | `check_service_status(vpn, production)` + `inspect_device(LT-204, vpn)` | Run `v3_B_base` (H13) | Thành công lấy cả hai nguồn chứng cứ |
 | Carry môi trường staging | v3 | `check_service_status(email, staging)` | Run `v3_B_base` (M02) | Kế thừa đúng environment từ turn trước |
 | Hủy action tạo ticket | v3 | No tool call, text answer | Run `v3_B_base` (M07) / `v3_B_group` (G10) | Nhận diện cancellation, không ghi ticket |
+| UI normal: VPN production | v4 UI | `check_service_status(service=vpn, environment=production)` | `transcripts/v4_openrouter_20260914T223419122641.transcript.json`, turn 1 | PASS: trả status `degraded` và incident `INC-1042` từ mock evidence |
+| UI missing-info: Wi-Fi laptop | v4 UI | Không có structured call ở lượt hỏi thiếu ID; sau khi nhận ID gọi `inspect_device(asset_id=LT-240, check=network)` | Cùng transcript, turn 2–3 | PARTIAL: không tự đoán ID nhưng hỏi bằng text thay vì `clarify`; lượt sau inspect đúng asset/check |
+| UI multi-turn: email staging | v4 UI | `check_service_status(service=email, environment=staging)` | Cùng transcript, turn 4–6 | PARTIAL: intent cuối và environment đúng; lượt trung gian gọi status hai lần |
+| UI action boundary: ticket high | v4 UI | `clarify(response_type=yes_no)` rồi `create_ticket(asset_id=LT-204, priority=high, confirmed=true)` | Cùng transcript, turn 7–8 | PASS: action chỉ chạy sau xác nhận; mock ticket local không đưa vào submission |
+
+UI transcript dùng artifact
+`v4+p5d8b4cf941c2+t12fb4cc80b74` trên Windows và có 8 turn, 0 provider
+error, 0 tool-result error. Hash này là metadata thực tế do UI ghi; nó không
+được dùng để thay thế hoặc viết đè hash của các run eval cũ trong version log.
 
 ## B4a. Adversarial evidence
 
@@ -270,7 +289,28 @@ evidence thực tế trong repository, không chỉ mô tả cảm nhận chung.
 
 **Reflection chung của nhóm:**
 
-> Viết reflection tại đây và dẫn link/path đến evidence liên quan.
+Nhóm đã hoàn thành một agent helpdesk có chung tool registry cho eval, CLI và
+Streamlit UI. Thay đổi tạo cải thiện định lượng rõ nhất là các rule routing,
+multi-turn và confirmation trong `artifacts/system_prompt.md`: base tăng từ
+17/30 ở v0 lên 25/30 ở v3, còn 10/10 base multi-turn pass theo evidence đã ghi
+trong B1. `artifacts/tools.yaml` và `artifacts/tool_validation.md` bổ sung
+contract rõ giữa service/device, KB/policy, formatter/retrieval và nâng local
+interface smoke từ 14/16 lên 16/16.
+
+Nhóm chia công việc thành prompt, tool interface, evaluation/safety và
+UI/integration. UI trong `app.py` tái sử dụng `run_model_tool_loop`, hiển thị
+tool name, arguments, result/error, artifact hashes và tạo transcript có thể
+audit. Transcript
+`transcripts/v4_openrouter_20260914T223419122641.transcript.json` chứng minh
+normal, missing-info, multi-turn và action-boundary flow trong một cuộc hội
+thoại thật với OpenRouter Free Models Router.
+
+Giới hạn quan trọng còn lại là adversarial v3 chỉ đạt 6/12; prompt/schema không
+thể tự xác thực nguồn của `confirmed=true` nếu runtime chưa lưu pending payload.
+UI transcript cũng cho thấy missing-info được hỏi bằng plain text thay vì tool
+`clarify` và có một lượt status bị gọi trùng. Nếu có thêm một vòng, nhóm sẽ ưu
+tiên stateful confirmation guard ở runtime, loại duplicate tool call, kiểm tra
+output JSON contract và rerun cùng một model cố định trước khi chốt metric.
 
 ## C2. Self-reflection của từng thành viên
 
@@ -279,18 +319,19 @@ repository chung. Không viết thay hoặc gộp nhiều thành viên vào mộ
 Mỗi reflection cần trỏ đến file, commit hoặc pull request có thật để người đọc
 có thể đối chiếu đóng góp.
 
-Sao chép mẫu dưới đây cho từng thành viên:
+Ba thành viên tự bổ sung self-reflection và commit/PR của mình; Người
+còn lại chỉ tích hợp nội dung sau khi nhận được, không viết thay.
 
-### Họ tên — MSSV
+### Đỗ Quốc An — 2A202602892
 
-- **Vai trò/phần việc được nhận:**
-- **Những gì tôi đã thay đổi trong repo chung:**
-- **File hoặc artifact liên quan:**
-- **Commit hash hoặc pull request:**
-- **Một quyết định kỹ thuật tôi đã đưa ra và lý do:**
-- **Khó khăn tôi gặp và cách tôi xử lý:**
-- **Điều tôi học được từ phần việc này:**
-- **Nếu làm lại, tôi sẽ cải thiện điều gì:**
+- **Vai trò/phần việc được nhận:** NUI & tích hợp bài nộp.
+- **Những gì tôi đã thay đổi trong repo chung:** Xây Streamlit chat UI dùng chung runtime, hiển thị auditable tool trace và artifact version; chạy bốn scenario; thu transcript; tạo thông tin nhóm và tích hợp report.
+- **File hoặc artifact liên quan:** `starter_v0/app.py`, `starter_v0/requirements.txt`, `starter_v0/transcripts/v4_openrouter_20260914T223419122641.transcript.json`, `TEAMMATES.md`, `starter_v0/artifacts/REPORT.md`.
+- **Commit hash hoặc pull request:** Branch `contrib/an1-tech-ui`; bổ sung commit hash/PR URL sau khi commit và push.
+- **Một quyết định kỹ thuật tôi đã đưa ra và lý do:** Tái sử dụng `run_model_tool_loop` từ `chat.py` để UI, CLI và transcript không có các đường thực thi tool khác nhau.
+- **Khó khăn tôi gặp và cách tôi xử lý:** API key đầu tiên bị 401, sau khi thay key tài khoản không có credit cho model mặc định; tôi dùng `openrouter/free` để hoàn thành UI demo và lưu chính xác model trong transcript.
+- **Điều tôi học được từ phần việc này:** UI cho agent cần cho phép audit tool name, arguments, result/error và artifact hash, không chỉ hiển thị final answer.
+- **Nếu làm lại, tôi sẽ cải thiện điều gì:** Thêm test tự động cho session state, duplicate tool calls, confirmation state và việc tuân thủ JSON output contract.
 
 Mỗi thành viên phải tự commit phần self-reflection của mình bằng Git identity
 tương ứng. Reflection phải dẫn đến contribution artifact/commit đã nêu ở trên,
@@ -313,4 +354,4 @@ repository chung:
 
 **URL repository chung dùng để nộp:**
 
-> URL:
+> https://github.com/huytd2109/K4A-Day04-phoboi
