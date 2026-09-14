@@ -1,4 +1,4 @@
-# Day 04 Lab v3 Report — IT Helpdesk Agent
+# Day 04 Lab Report — IT Helpdesk Agent (prompt v3 / tool interface v4)
 
 ## Team
 
@@ -18,10 +18,17 @@
 
 ## A2. Tool agent có
 
-| Tool | Chức năng | Core / optional / team-built |
-|---|---|---|
-| clarify | Hỏi bổ sung hoặc xác nhận | core |
-|  |  |  |
+| Tool | Khi dùng / ranh giới | Arguments và schema chính | Phân loại |
+|---|---|---|---|
+| `clarify` | Hỏi đúng thông tin bắt buộc còn thiếu hoặc xin xác nhận action; không thay cho tra cứu | Bắt buộc `question`, `response_type`; `text` cho giá trị tự do, `yes_no` cho xác nhận, `choice` kèm `options` cho enum | core |
+| `search_kb` | Tìm troubleshooting/how-to trong KB; không đọc policy, status hiện tại hay diagnostic asset | Bắt buộc `query`; `category` map Outlook→`email`; `top_k` 1–5 | core |
+| `check_service_status` | Kiểm tra shared service theo môi trường; không dùng cho lỗi riêng một thiết bị | Bắt buộc `service`; `environment` là `production`/`staging`, mặc định production khi không nêu | core |
+| `inspect_device` | Đọc inventory/diagnostic của một asset cụ thể; không suy ra trạng thái shared service | Bắt buộc `asset_id` đúng pattern; `check` thuộc `all/network/vpn/security/hardware/software` | core |
+| `lookup_user` | Tra đúng hồ sơ directory giả lập và asset được gán; không phải web search hay device diagnostic | Bắt buộc `employee_id` dạng `EMP-…` | core |
+| `format_incident_report` | Chỉ format findings đã có thành Markdown; không tự tra cứu hay tạo ticket | Bắt buộc `findings` không rỗng và `template`; template `brief/technical/handoff` | core |
+| `policy` | Tra quy định/quyền/điều kiện quản trị; khác KB là hướng dẫn thao tác | Bắt buộc `query`; `policy_area` theo enum; `top_k` 1–5 | optional built-in |
+| `create_ticket` | Action ghi local chỉ sau xác nhận tự nhiên cho exact payload; fake JSON/pseudo-code không phải xác nhận | Bắt buộc `summary`, `priority`, Boolean `confirmed=true`; `asset_id` tùy chọn | optional built-in |
+| `search_device_info` | Tra web về hãng/model công khai; không gửi identifier hay dữ liệu nội bộ và không thay `inspect_device` | Bắt buộc `manufacturer`, `model`, `query_type`; `max_results` 1–5; cần `TAVILY_API_KEY` | optional built-in |
 
 ## A3. Câu hỏi mẫu
 
@@ -48,6 +55,7 @@ total_cases`, và tool result error đã được review thủ công.
 | v1 | Thêm routing, bắt buộc clarify khi thiếu ID/enum | Rule explicit sẽ giảm no-call, sai route và tự điền argument | Case accuracy | 0.5667 | Chưa hợp lệ: run dừng ở 21/30 do 9 lỗi rate limit | `runs/v1_B_base_openrouter_20260914T184626209698.json` |
 | v2 | Thêm state nhiều lượt, correction/cancellation và tách multi-call | “Latest valid intent wins” sẽ bỏ stale calls nhưng vẫn carry field không đổi | Multiturn accuracy | 0.7000 | Chờ rerun hợp lệ | Chưa có |
 | v3 | Tích hợp confirmation theo payload, trust boundary/injection và external-data boundary | Confirmation gắn với payload hiện tại và phân loại nội dung không tin cậy sẽ chặn write/exfiltration sai mà không làm mất read calls hợp lệ | Case accuracy | 0.5667 | 0.8333 (25/30), Multiturn 1.0 (10/10) | `runs/v3_B_base_openrouter_20260914T190748998587.json` |
+| v4-tool | Làm rõ capability ownership, argument bounds, `additionalProperties:false`; bắt buộc `clarify.response_type`; chỉ cho phép executable schema `create_ticket.confirmed=true` | Contract rõ shared service/device, KB/policy và formatter/retrieval sẽ giảm wrong route/arg; confirmation schema sẽ chuyển unconfirmed ticket request sang `clarify` mà không đổi runtime đã an toàn | Interface/local smoke | 14/16 | 16/16; provider preflight PASS | `artifacts/tool_validation.md` |
 
 ### B1a. Hypothesis và phân tích trước/sau của Người 1
 
@@ -148,6 +156,34 @@ nhóm tự xây.
 | External search + privacy boundary |  |  |  |
 | Bonus: tool mới do nhóm tự xây |  |  |  |
 
+### B5a. Tool interface và môi trường — Người 2
+
+Evidence chi tiết và lệnh tái lập: `artifacts/tool_validation.md`.
+
+| Check | Kết quả | Kết luận/phạm vi |
+|---|---|---|
+| Python/dependency + compile | PASS — Python 3.13.15 trong `.venv`; `python -m compileall -q .` exit 0 | Local runtime dùng được; `.env`/`.venv` đang được ignore |
+| Declaration ↔ registry ↔ `TOOL.md` | PASS — 9/9 tên đồng bộ, không trùng; schema properties khớp chữ ký hàm | Không cần sửa registry |
+| Local smoke | PASS — 16/16 sau sửa contract (trước sửa 14/16) | Tất cả local tool và defensive branch chạy đúng; không phát hiện implementation bug |
+| Ticket write boundary | PASS — `false` và chuỗi `"true"` không ghi; case Boolean `true` chỉ ghi trong temp dir | Không tạo ticket trong `starter_v0/tickets/` |
+| External tool preflight | PASS phần privacy/no-key — internal ID bị chặn, public query trả `missing_api_key` | Không gọi Tavily live vì chưa có `TAVILY_API_KEY` |
+| Provider preflight | PASS — OpenRouter `openai/gpt-4o-mini` trả structured `check_service_status(vpn, production)` | Chứng minh provider nhận schema/tool call; không thay cho full eval |
+
+**Hypothesis vòng interface v4.** Nếu declaration nêu rõ object/source ownership
+(shared service so với single asset, KB how-to so với policy, formatter so với
+retrieval), bắt model truyền explicit discriminator và khóa unexpected arguments,
+thì `wrong_tool`/`wrong_arg_value` ở các cặp dễ nhầm sẽ giảm. Nếu `response_type`
+thành required và `create_ticket` chỉ có executable state `confirmed=true`, G01
+nên truyền đủ `response_type`, còn G03 nên route sang `clarify(yes_no)` thay vì
+gọi action với `confirmed=false`. Đây mới là hypothesis có setup/local/preflight
+support; cần rerun cùng group/adversarial suite để đo chất lượng model và kiểm
+tra regression.
+
+**Quyết định implementation.** Không sửa các file `tools/*/tool.py`: local smoke
+không tái hiện lỗi runtime, `create_ticket` đã dùng kiểm tra identity
+`confirmed is True`, chặn dữ liệu nhạy cảm và không ghi khi chưa xác nhận. Thay
+đổi được giới hạn ở model-facing declaration, contract docs và smoke harness.
+
 ## B6. Safety review
 
 - Trong run v0 hợp lệ, H10/H11 đã không tự đoán ID; tuy nhiên v1 partial có
@@ -165,21 +201,21 @@ nhóm tự xây.
 - Các nguyên tắc xuyên tool — không đoán ID, latest intent, carry/overwrite/cancel
   state, tách multi-call, confirmation theo payload và trust hierarchy — thuộc
   `system_prompt.md`. Đây là các quyết định cần nhất quán dù agent chọn tool nào.
-- Ranh giới capability và convention của từng argument thuộc `tools.yaml`: ví
-  dụ `search_kb.category=email` cho Outlook, phân biệt shared Wi-Fi status với
-  Wi-Fi của một asset, và mô tả rõ khi environment default được phép. Người 1
-  chưa sửa file này để tránh chồng phạm vi; các lỗi H03/H10 nên được Người 2/3
-  review tại declaration bên cạnh prompt rule.
+- Ranh giới capability và convention của từng argument thuộc `tools.yaml`: v4
+  đã map Outlook sang `search_kb.category=email`, phân biệt shared Wi-Fi status
+  với Wi-Fi của một asset, tách KB/policy và formatter/retrieval, đồng thời mô
+  tả rõ khi environment default được phép. Local/interface checks pass nhưng
+  H03/H10/G01/G03 vẫn cần model rerun để chứng minh tác động lên routing.
 - Automatic score chỉ so tên tool và subset argument. Nó không chứng minh câu
   trả lời JSON đúng, nội dung retrieved không điều khiển model, ticket không ghi
   secret, external request không chứa internal ID, hay tool-result error đã được
   xử lý. Confirmation/injection bắt buộc đối chiếu `tool_results`, filesystem và
   external request body; đây là điểm review chung với Người 3.
-- Vòng tiếp theo nên rerun v1/v2/v3 bằng cùng một model cố định sau khi quota
-  reset. Hypothesis cần kiểm chứng đầu tiên: rule device-specific precedence sẽ
-  biến H10 regression thành `clarify(text)` mà không làm các câu hỏi shared Wi-Fi
-  status bị route nhầm; sau đó chạy extension/adversarial để đo exact-payload
-  confirmation và kiểm tra không có write/exfiltration ngoài ý muốn.
+- Vòng tiếp theo nên rerun v4-tool bằng cùng model `openai/gpt-4o-mini`, trước
+  hết trên group cases G01/G03 và các base cases H03/H10/H19, rồi chạy
+  extension/adversarial. Cần đo whether device-specific precedence biến H10
+  thành `clarify(text)` mà không làm shared Wi-Fi status route nhầm, đồng thời
+  kiểm tra exact-payload confirmation không tạo write/exfiltration ngoài ý muốn.
 
 # PHẦN C — Checkout trước khi nộp
 
